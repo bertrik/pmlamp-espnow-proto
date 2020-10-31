@@ -118,8 +118,8 @@ void setup(void)
     printf("ESP ID: %s\n", esp_id);
 
     esp_now_init();
-    esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-    esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_SLAVE, ESPNOW_CHANNEL, NULL, 0);
+    esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+    esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_CONTROLLER, ESPNOW_CHANNEL, NULL, 0);
     esp_now_register_recv_cb(rx_callback);
     esp_now_register_send_cb(tx_callback);
 

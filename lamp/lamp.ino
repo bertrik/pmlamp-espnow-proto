@@ -97,9 +97,11 @@ void setup(void)
     sprintf(esp_id, "%08X", ESP.getChipId());
     printf("ESP ID: %s\n", esp_id);
 
+    WiFi.mode(WIFI_AP);
+
     esp_now_init();
-    esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-    esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_COMBO, ESPNOW_CHANNEL, NULL, 0);
+    esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+    esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_SLAVE, ESPNOW_CHANNEL, NULL, 0);
     esp_now_register_recv_cb(rx_callback);
     esp_now_register_send_cb(tx_callback);
 }
