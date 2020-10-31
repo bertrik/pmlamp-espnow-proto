@@ -34,14 +34,31 @@ static bool send_unicast(uint8_t * mac, const char *data)
     return rc == 0;
 }
 
-static int do_rgb(int argc, char *argv[])
+static int do_led(int argc, char *argv[])
 {
     if (argc < 2) {
         return -1;
     }
+
+    char *color = argv[1];
+    const char *rgb = "000000";
+    if (strlen(color) == 1) {
+        switch (*color) {
+        case 'r':   rgb = "FF0000"; break;
+        case 'y':   rgb = "FFFF00"; break;
+        case 'g':   rgb = "00FF00"; break;
+        case 'c':   rgb = "00FFFF"; break;
+        case 'b':   rgb = "0000FF"; break;
+        case 'm':   rgb = "FF00FF"; break;
+        case 'w':   rgb = "FFFFFF"; break;
+        }
+    } else if (strlen(color) == 6) {
+        rgb = color;
+    }
+
     DynamicJsonDocument doc(500);
     doc["msg"] = "data";
-    doc["color"] = argv[1];
+    doc["color"] = "#" + String(rgb);
     String json;
     serializeJson(doc, json);
 
@@ -53,7 +70,7 @@ static int do_rgb(int argc, char *argv[])
 static int do_help(int argc, char *argv[]);
 const cmd_t commands[] = {
     { "help", do_help, "Show help" },
-    { "rgb", do_rgb, "Send RGB value" },
+    { "led", do_led, "<hexcode|colorcode> Send LED value" },
     { NULL, NULL, NULL }
 };
 

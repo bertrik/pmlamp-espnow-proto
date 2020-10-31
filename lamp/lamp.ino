@@ -81,8 +81,10 @@ static void rx_callback(uint8_t * mac, uint8_t * data, uint8_t len)
     if (strcmp(msg, "data") == 0) {
         printf("received DATA!\n");
         const char *color = doc["color"];
-        int rgb = strtoul(color, NULL, 16);
-        FastLED.showColor(rgb);
+        if (color[0] == '#') {
+            int rgb = strtoul(color + 1, NULL, 16);
+            FastLED.showColor(rgb);
+        }
     }
 }
 
