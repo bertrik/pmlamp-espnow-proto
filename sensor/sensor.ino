@@ -44,13 +44,27 @@ static int do_led(int argc, char *argv[])
     const char *rgb = "000000";
     if (strlen(color) == 1) {
         switch (*color) {
-        case 'r':   rgb = "FF0000"; break;
-        case 'y':   rgb = "FFFF00"; break;
-        case 'g':   rgb = "00FF00"; break;
-        case 'c':   rgb = "00FFFF"; break;
-        case 'b':   rgb = "0000FF"; break;
-        case 'm':   rgb = "FF00FF"; break;
-        case 'w':   rgb = "FFFFFF"; break;
+        case 'r':
+            rgb = "FF0000";
+            break;
+        case 'y':
+            rgb = "FFFF00";
+            break;
+        case 'g':
+            rgb = "00FF00";
+            break;
+        case 'c':
+            rgb = "00FFFF";
+            break;
+        case 'b':
+            rgb = "0000FF";
+            break;
+        case 'm':
+            rgb = "FF00FF";
+            break;
+        case 'w':
+            rgb = "FFFFFF";
+            break;
         }
     } else if (strlen(color) == 6) {
         rgb = color;
@@ -87,13 +101,45 @@ static int do_help(int argc, char *argv[])
     return CMD_OK;
 }
 
+static struct tx_event_t {
+    bool event;
+    uint8_t mac[6];
+    uint8_t status;
+} tx_event;
+
+// copies data to be processed up by non-callback code
 static void tx_callback(uint8_t * mac, uint8_t status)
+{
+    memcpy(tx_event.mac, mac, 6);
+    tx_event.status = status;
+    tx_event.event = true;
+}
+
+// handles transmitted data
+static void process_tx(uint8_t * mac, uint8_t status)
 {
     printf("tx: %02X:%02X:%02X:%02X:%02X:%02X, stat = 0x%02X\n",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], status);
 }
 
+static struct rx_event_t {
+    bool event;
+    uint8_t mac[6];
+    uint8_t data[256];
+    size_t len;
+} rx_event;
+
+// copies data to be processed by non-callback code
 static void rx_callback(uint8_t * mac, uint8_t * data, uint8_t len)
+{
+    memcpy(rx_event.mac, mac, 6);
+    memcpy(rx_event.data, data, len);
+    rx_event.len = len;
+    rx_event.event = true;
+}
+
+// handled received data
+static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
 {
     printf("rx %d bytes from: %02X:%02X:%02X:%02X:%02X:%02X: ", len,
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -147,6 +193,15 @@ void setup(void)
 
 void loop(void)
 {
+    // process ESP-NOW events
+    if (rx_event.event) {
+        process_rx(rx_event.mac, rx_event.data, rx_event.len);
+        rx_event.event = false;
+    }
+    if (tx_event.event) {
+        process_tx(tx_event.mac, tx_event.status);
+        tx_event.event = false;
+    }
     // parse command line
     bool haveLine = false;
     if (Serial.available()) {
