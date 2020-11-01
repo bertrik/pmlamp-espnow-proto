@@ -21,6 +21,19 @@ static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static uint8_t peer_mac[6];
 
+static struct rx_event_t {
+    bool event;
+    uint8_t mac[6];
+    uint8_t data[256];
+    size_t len;
+} rx_event;
+
+static struct tx_event_t {
+    bool event;
+    uint8_t mac[6];
+    int status;
+} tx_event;
+
 static bool send_unicast(uint8_t * mac, const char *data)
 {
     printf("send_unicast to %02X:%02X:%02X:%02X:%02X:%02X... %s\n",
@@ -32,6 +45,18 @@ static bool send_unicast(uint8_t * mac, const char *data)
         printf("esp_now_send fail %d\n", rc);
     }
     return rc == 0;
+}
+
+// sends a unicast packet, blocks until transmit result is available
+static bool send_unicast_blocking(uint8_t * mac, const char *data)
+{
+    tx_event.status = -1;
+    tx_event.event = false;
+    if (send_unicast(mac, data)) {
+        while (!tx_event.event) yield();
+        tx_event.event = false;
+    }
+    return tx_event.status == 0;
 }
 
 static int do_led(int argc, char *argv[])
@@ -80,7 +105,7 @@ static int do_led(int argc, char *argv[])
     serializeJson(doc, json);
 
     const char *cmd = json.c_str();
-    bool ok = send_unicast(peer_mac, cmd);
+    bool ok = send_unicast_blocking(peer_mac, cmd);
     return ok ? CMD_OK : -1;
 }
 
@@ -104,12 +129,6 @@ static int do_help(int argc, char *argv[])
     return CMD_OK;
 }
 
-static struct tx_event_t {
-    bool event;
-    uint8_t mac[6];
-    uint8_t status;
-} tx_event;
-
 // copies data to be processed up by non-callback code
 static void tx_callback(uint8_t * mac, uint8_t status)
 {
@@ -124,13 +143,6 @@ static void process_tx(uint8_t * mac, uint8_t status)
     printf("tx: %02X:%02X:%02X:%02X:%02X:%02X, stat = 0x%02X\n",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], status);
 }
-
-static struct rx_event_t {
-    bool event;
-    uint8_t mac[6];
-    uint8_t data[256];
-    size_t len;
-} rx_event;
 
 // copies data to be processed by non-callback code
 static void rx_callback(uint8_t * mac, uint8_t * data, uint8_t len)
@@ -157,19 +169,20 @@ static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
         printf("deserializeJson error\n");
         return;
     }
-    // send back reply
+    // handle "discover" packet
     const char *msg = doc["msg"];
     if (strcmp(msg, "discover") == 0) {
-        memcpy(peer_mac, mac, 6);
-        // send back associate
+        // send back "associate"
         doc.clear();
         doc["msg"] = "associate";
         doc["id"] = "SENSOR-" + String(esp_id);
         String rsp;
         serializeJson(doc, rsp);
         const char *response = rsp.c_str();
-        if (!send_unicast(mac, response)) {
-            printf("send_unicast fail\n");
+        if (send_unicast_blocking(mac, response)) {
+            memcpy(peer_mac, mac, 6);
+        } else {
+            printf("failed to send associate message\n");
         }
     }
 }
