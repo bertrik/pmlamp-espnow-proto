@@ -36,35 +36,38 @@ static bool send_unicast(uint8_t * mac, const char *data)
 
 static int do_led(int argc, char *argv[])
 {
+    static struct color_entry_t {
+        char c;
+        const char *name;
+        const char *rgb;
+    } color_table[] = {
+        {'r', "red", "FF0000" },
+        {'g', "green", "00FF00" },
+        {'b', "blue", "0000FF" },
+        {'c', "cyan", "00FFFF" },
+        {'m', "magenta", "FF00FF" },
+        {'y', "yellow", "FFFF00" },
+        {'k', "black", "000000" },
+        {'w', "white", "FFFFFF" },
+        {'\0'}
+    };
+
     if (argc < 2) {
-        return -1;
+        printf("Available colors:\n");
+        for (color_entry_t *entry = color_table; entry->c != 0; entry++) {
+            printf("%c %8s %s\n", entry->c, entry->name, entry->rgb);
+        }
+        return 0;
     }
 
     char *color = argv[1];
     const char *rgb = "000000";
     if (strlen(color) == 1) {
-        switch (*color) {
-        case 'r':
-            rgb = "FF0000";
-            break;
-        case 'y':
-            rgb = "FFFF00";
-            break;
-        case 'g':
-            rgb = "00FF00";
-            break;
-        case 'c':
-            rgb = "00FFFF";
-            break;
-        case 'b':
-            rgb = "0000FF";
-            break;
-        case 'm':
-            rgb = "FF00FF";
-            break;
-        case 'w':
-            rgb = "FFFFFF";
-            break;
+        for (color_entry_t *entry = color_table; entry->c != 0; entry++) {
+            if (*color == entry->c) {
+                printf("Selecting color '%s'\n", entry->name);
+                rgb = entry->rgb;
+            }
         }
     } else if (strlen(color) == 6) {
         rgb = color;
