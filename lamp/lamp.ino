@@ -33,6 +33,12 @@ static bool send_broadcast(const char *data)
     return rc == 0;
 }
 
+static bool send_unicast(uint8_t * mac, const char *data)
+{
+    esp_now_add_peer(mac, ESP_NOW_ROLE_SLAVE, ESPNOW_CHANNEL, NULL, 0);
+    return esp_now_send((u8 *) mac, (u8 *) data, (u8) strlen(data)) == 0;
+}
+
 static int do_help(int argc, char *argv[]);
 const cmd_t commands[] = {
     { "help", do_help, "Show help" },
@@ -85,6 +91,13 @@ static void rx_callback(uint8_t * mac, uint8_t * data, uint8_t len)
             int rgb = strtoul(color + 1, NULL, 16);
             FastLED.showColor(rgb);
         }
+    }
+    if (strcmp(msg, "ping") == 0) {
+        doc.clear();
+        doc["msg"] = "pong";
+        String json;
+        serializeJson(doc, json);
+        send_unicast(mac, json.c_str());
     }
 }
 

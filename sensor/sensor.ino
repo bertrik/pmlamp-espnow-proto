@@ -109,10 +109,22 @@ static int do_led(int argc, char *argv[])
     return ok ? CMD_OK : -1;
 }
 
+static int do_ping(int argc, char *argv[])
+{
+    DynamicJsonDocument doc(500);
+    doc["msg"] = "ping";
+    String json;
+    serializeJson(doc, json);
+    const char *cmd = json.c_str();
+    bool ok = send_unicast_blocking(peer_mac, cmd);
+    return ok ? CMD_OK : -1;
+}
+
 static int do_help(int argc, char *argv[]);
 const cmd_t commands[] = {
     { "help", do_help, "Show help" },
     { "led", do_led, "<hexcode|colorcode> Send LED value" },
+    { "ping", do_ping, "Pings the lamp" },
     { NULL, NULL, NULL }
 };
 
