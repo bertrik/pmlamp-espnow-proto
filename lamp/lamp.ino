@@ -25,6 +25,36 @@ static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 static bool associated = false;
 static CRGB leds[1];
 
+static struct rx_event_t {
+    bool event;
+    uint8_t mac[6];
+    uint8_t data[256];
+    size_t len;
+} rx_event;
+
+static struct tx_event_t {
+    bool event;
+    uint8_t mac[6];
+    int status;
+} tx_event;
+
+// copies data to be processed by non-callback code
+static void rx_callback(uint8_t * mac, uint8_t * data, uint8_t len)
+{
+    memcpy(rx_event.mac, mac, 6);
+    memcpy(rx_event.data, data, len);
+    rx_event.len = len;
+    rx_event.event = true;
+}
+
+// copies data to be processed up by non-callback code
+static void tx_callback(uint8_t * mac, uint8_t status)
+{
+    memcpy(tx_event.mac, mac, 6);
+    tx_event.status = status;
+    tx_event.event = true;
+}
+
 static bool send_broadcast(const char *data)
 {
     printf("send_broadcast %s...\n", data);
@@ -58,13 +88,13 @@ static int do_help(int argc, char *argv[])
     return CMD_OK;
 }
 
-static void tx_callback(uint8_t * mac, uint8_t status)
+static void process_tx(uint8_t * mac, uint8_t status)
 {
     printf("tx: %02X:%02X:%02X:%02X:%02X:%02X, stat = 0x%02X\n",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], status);
 }
 
-static void rx_callback(uint8_t * mac, uint8_t * data, uint8_t len)
+static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
 {
     printf("rx %d bytes from: %02X:%02X:%02X:%02X:%02X:%02X:\n", len,
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -123,6 +153,16 @@ void setup(void)
 
 void loop(void)
 {
+    // process ESP-NOW events
+    if (rx_event.event) {
+        process_rx(rx_event.mac, rx_event.data, rx_event.len);
+        rx_event.event = false;
+    }
+    if (tx_event.event) {
+        process_tx(tx_event.mac, tx_event.status);
+        tx_event.event = false;
+    }
+
     // send every second
     static int last_period = -1;
     int period = millis() / 1000;
@@ -144,6 +184,7 @@ void loop(void)
         last_period = period;
         FastLED.showColor(CRGB::Black);
     }
+
     // parse command line
     bool haveLine = false;
     if (Serial.available()) {
