@@ -123,8 +123,6 @@ void setup(void)
 
 void loop(void)
 {
-    static int index = 0;
-
     // send every second
     static int last_period = -1;
     int period = millis() / 1000;
@@ -137,15 +135,13 @@ void loop(void)
         String json;
         serializeJson(doc, json);
 
-        int channel = index + 1;
-        printf("Sending on channel %d...\n", channel);
-        esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_COMBO, channel, NULL, 0);
+        printf("Sending...\n");
+        esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_COMBO, ESPNOW_CHANNEL, NULL, 0);
         if (!send_broadcast(json.c_str())) {
             printf("send_broadcast failed!\n");
         }
 
         last_period = period;
-        index = (index + 1) % 12;
         FastLED.showColor(CRGB::Black);
     }
     // parse command line
