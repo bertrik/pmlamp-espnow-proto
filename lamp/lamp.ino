@@ -16,14 +16,18 @@
 #define printf Serial.printf
 
 #define ESPNOW_CHANNEL 1
+
+// we send the colour to two sets of LEDs: a single LED on pin D2, a star of 7 LEDs on pin D4
 #define DATA_PIN_1LED   D2
+#define DATA_PIN_7LED   D4
 
 static char esp_id[16];
 static char editline[256];
 static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static bool associated = false;
-static CRGB leds[1];
+static CRGB leds1[1];
+static CRGB leds7[7];
 
 static struct rx_event_t {
     bool event;
@@ -136,7 +140,14 @@ void setup(void)
     Serial.begin(115200);
     EditInit(editline, sizeof(editline));
 
-    FastLED.addLeds < WS2812B, DATA_PIN_1LED, GRB > (leds, 1).setCorrection(TypicalSMD5050);
+#ifdef LED_RGB
+    FastLED.addLeds < WS2812B, DATA_PIN_1LED, RGB > (leds1, 1).setCorrection(TypicalSMD5050);
+    FastLED.addLeds < WS2812B, DATA_PIN_7LED, RGB > (leds7, 7).setCorrection(TypicalSMD5050);
+#endif
+#ifdef LED_GRB
+    FastLED.addLeds < WS2812B, DATA_PIN_1LED, GRB > (leds1, 1).setCorrection(TypicalSMD5050);
+    FastLED.addLeds < WS2812B, DATA_PIN_7LED, GRB > (leds7, 7).setCorrection(TypicalSMD5050);
+#endif
 
     // get ESP id
     sprintf(esp_id, "%08X", ESP.getChipId());
