@@ -16,6 +16,7 @@
 #define printf Serial.printf
 
 #define ESPNOW_CHANNEL 1
+#define KEEPALIVE_TIMEOUT   300
 
 // we send the colour to two sets of LEDs: a single LED on pin D2, a star of 7 LEDs on pin D4
 #define DATA_PIN_1LED   D2
@@ -26,6 +27,7 @@ static char editline[256];
 static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static bool associated = false;
+static unsigned long last_received = 0;
 static CRGB leds1[1];
 static CRGB leds7[7];
 
@@ -98,7 +100,7 @@ static void process_tx(uint8_t * mac, uint8_t status)
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], status);
 }
 
-static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
+static void process_rx(unsigned long second, uint8_t * mac, uint8_t * data, uint8_t len)
 {
     printf("rx %d bytes from: %02X:%02X:%02X:%02X:%02X:%02X:\n", len,
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -133,6 +135,7 @@ static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
         serializeJson(doc, json);
         send_unicast(mac, json.c_str());
     }
+    last_received = second;
 }
 
 void setup(void)
@@ -164,9 +167,12 @@ void setup(void)
 
 void loop(void)
 {
+    static unsigned long last_second = -1;
+    unsigned long second = millis() / 1000;
+
     // process ESP-NOW events
     if (rx_event.event) {
-        process_rx(rx_event.mac, rx_event.data, rx_event.len);
+        process_rx(second, rx_event.mac, rx_event.data, rx_event.len);
         rx_event.event = false;
     }
     if (tx_event.event) {
@@ -175,25 +181,29 @@ void loop(void)
     }
 
     // send every second
-    static int last_period = -1;
-    int period = millis() / 1000;
-    if (!associated && (period != last_period)) {
-        FastLED.showColor(CRGB::Blue);
-        DynamicJsonDocument doc(500);
-        doc["msg"] = "discover";
-        doc["id"] = "PMLAMP-" + String(esp_id);
-
-        String json;
-        serializeJson(doc, json);
-
-        printf("Sending...\n");
-        esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_COMBO, ESPNOW_CHANNEL, NULL, 0);
-        if (!send_broadcast(json.c_str())) {
-            printf("send_broadcast failed!\n");
+    if (associated) {
+        if ((last_received - second) > KEEPALIVE_TIMEOUT) {
+            associated = false;
         }
+    } else {
+        if (second != last_second) {
+            FastLED.showColor(CRGB::Blue);
+            DynamicJsonDocument doc(500);
+            doc["msg"] = "discover";
+            doc["id"] = "PMLAMP-" + String(esp_id);
 
-        last_period = period;
-        FastLED.showColor(CRGB::Black);
+            String json;
+            serializeJson(doc, json);
+
+            printf("Sending...\n");
+            esp_now_add_peer(bcast_mac, ESP_NOW_ROLE_COMBO, ESPNOW_CHANNEL, NULL, 0);
+            if (!send_broadcast(json.c_str())) {
+                printf("send_broadcast failed!\n");
+            }
+
+            last_second = second;
+            FastLED.showColor(CRGB::Black);
+        }
     }
 
     // parse command line
