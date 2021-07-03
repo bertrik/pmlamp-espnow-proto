@@ -100,9 +100,9 @@ static void process_tx(uint8_t * mac, uint8_t status)
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], status);
 }
 
-static void process_rx(unsigned long second, uint8_t * mac, uint8_t * data, uint8_t len)
+static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
 {
-    printf("rx %d bytes from: %02X:%02X:%02X:%02X:%02X:%02X:\n", len,
+    printf("rx %d bytes from: %02X:%02X:%02X:%02X:%02X:%02X\n", len,
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     char json[250];
@@ -135,7 +135,6 @@ static void process_rx(unsigned long second, uint8_t * mac, uint8_t * data, uint
         serializeJson(doc, json);
         send_unicast(mac, json.c_str());
     }
-    last_received = second;
 }
 
 void setup(void)
@@ -172,7 +171,8 @@ void loop(void)
 
     // process ESP-NOW events
     if (rx_event.event) {
-        process_rx(second, rx_event.mac, rx_event.data, rx_event.len);
+        last_received = second;
+        process_rx(rx_event.mac, rx_event.data, rx_event.len);
         rx_event.event = false;
     }
     if (tx_event.event) {
@@ -182,7 +182,7 @@ void loop(void)
 
     // send every second
     if (associated) {
-        if ((last_received - second) > KEEPALIVE_TIMEOUT) {
+        if ((second - last_received) > KEEPALIVE_TIMEOUT) {
             associated = false;
         }
     } else {
