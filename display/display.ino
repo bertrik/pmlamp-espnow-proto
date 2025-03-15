@@ -6,9 +6,7 @@
 #include <Arduino.h>
 #include <espnow.h>
 #include <ESP8266WiFi.h>
-
-#include "editline.h"
-#include "cmdproc.h"
+#include <MiniShell.h>
 
 #include <Wire.h>
 #include "SSD1306Wire.h"
@@ -25,7 +23,7 @@
 #define PIN_OLED_SDA    D2
 
 static char esp_id[16];
-static char editline[256];
+static MiniShell shell(&Serial);
 static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 // WEMOS-D1-MINI display shield, 64x48 pixels, apply offset of (32,16) for top-left 
@@ -93,7 +91,7 @@ static void show_help(const cmd_t * cmds)
 static int do_help(int argc, char *argv[])
 {
     show_help(commands);
-    return CMD_OK;
+    return 0;
 }
 
 static void process_tx(uint8_t * mac, uint8_t status)
@@ -142,7 +140,6 @@ static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
 void setup(void)
 {
     Serial.begin(115200);
-    EditInit(editline, sizeof(editline));
 
     // get ESP id
     sprintf(esp_id, "%08X", ESP.getChipId());
@@ -195,32 +192,6 @@ void loop(void)
 
         last_period = period;
     }
-    // parse command line
-    bool haveLine = false;
-    if (Serial.available()) {
-        char c;
-        haveLine = EditLine(Serial.read(), &c);
-        Serial.write(c);
-    }
-    if (haveLine) {
-        int result = cmd_process(commands, editline);
-        switch (result) {
-        case CMD_OK:
-            printf("OK\n");
-            break;
-        case CMD_NO_CMD:
-            break;
-        case CMD_UNKNOWN:
-            printf("Unknown command, available commands:\n");
-            show_help(commands);
-            break;
-        case CMD_ARG:
-            printf("Invalid argument(s)\n");
-            break;
-        default:
-            printf("%d\n", result);
-            break;
-        }
-        printf(">");
-    }
+    // command line processing
+    shell.process(">", commands);
 }
