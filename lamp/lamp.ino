@@ -10,7 +10,7 @@
 
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
 
 
 #define printf Serial.printf
@@ -28,8 +28,8 @@ static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static bool associated = false;
 static unsigned long last_received = 0;
-static CRGB leds1[1];
-static CRGB leds7[7];
+static Adafruit_NeoPixel strip1(1, DATA_PIN_1LED, NEO_GRB + NEO_KHZ400);
+static Adafruit_NeoPixel strip7(7, DATA_PIN_7LED, NEO_GRB + NEO_KHZ400);
 
 static struct rx_event_t {
     bool event;
@@ -124,8 +124,8 @@ static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
         printf("received DATA!\n");
         const char *color = doc["color"];
         if (color[0] == '#') {
-            int rgb = strtoul(color + 1, NULL, 16);
-            FastLED.showColor(rgb);
+            uint32_t rgb = strtoul(color + 1, NULL, 16);
+            set_color(rgb);
         }
     }
     if (strcmp(msg, "ping") == 0) {
@@ -137,19 +137,35 @@ static void process_rx(uint8_t * mac, uint8_t * data, uint8_t len)
     }
 }
 
+static void strip_fill(Adafruit_NeoPixel & strip, uint32_t rgb)
+{
+    for (int i = 0; i < strip.numPixels(); i++) {
+        strip.setPixelColor(i, rgb);
+    }
+    strip.show();
+}
+
+static void set_color(uint32_t rgb)
+{
+    strip_fill(strip1, rgb);
+    strip_fill(strip7, rgb);
+}
+
 void setup(void)
 {
     Serial.begin(115200);
     EditInit(editline, sizeof(editline));
 
 #ifdef LED_RGB
-    FastLED.addLeds < WS2812B, DATA_PIN_1LED, RGB > (leds1, 1).setCorrection(TypicalSMD5050);
-    FastLED.addLeds < WS2812B, DATA_PIN_7LED, RGB > (leds7, 7).setCorrection(TypicalSMD5050);
+    strip1.updateType(NEO_BGR);
+    strip7.updateType(NEO_BGR);
 #endif
 #ifdef LED_GRB
-    FastLED.addLeds < WS2812B, DATA_PIN_1LED, GRB > (leds1, 1).setCorrection(TypicalSMD5050);
-    FastLED.addLeds < WS2812B, DATA_PIN_7LED, GRB > (leds7, 7).setCorrection(TypicalSMD5050);
+    strip1.updateType(NEO_GRB);
+    strip7.updateType(NEO_GRB);
 #endif
+    strip1.begin();
+    strip7.begin();
 
     // get ESP id
     sprintf(esp_id, "%08X", ESP.getChipId());
@@ -187,7 +203,7 @@ void loop(void)
         }
     } else {
         if (second != last_second) {
-            FastLED.showColor(CRGB::Blue);
+            set_color(0x0000FF);
             DynamicJsonDocument doc(500);
             doc["msg"] = "discover";
             doc["id"] = "PMLAMP-" + String(esp_id);
@@ -202,7 +218,7 @@ void loop(void)
             }
 
             last_second = second;
-            FastLED.showColor(CRGB::Black);
+            set_color(0x000000);
         }
     }
 
