@@ -5,12 +5,10 @@
 
 #include <espnow.h>
 
-#include "editline.h"
-#include "cmdproc.h"
-
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h>
+#include <MiniShell.h>
 
 
 #define printf Serial.printf
@@ -23,13 +21,13 @@
 #define DATA_PIN_7LED   D4
 
 static char esp_id[16];
-static char editline[256];
 static uint8_t bcast_mac[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static bool associated = false;
 static unsigned long last_received = 0;
 static Adafruit_NeoPixel strip1(1, DATA_PIN_1LED, NEO_GRB + NEO_KHZ400);
 static Adafruit_NeoPixel strip7(7, DATA_PIN_7LED, NEO_GRB + NEO_KHZ400);
+static MiniShell shell(&Serial);
 
 static struct rx_event_t {
     bool event;
@@ -91,7 +89,7 @@ static void show_help(const cmd_t * cmds)
 static int do_help(int argc, char *argv[])
 {
     show_help(commands);
-    return CMD_OK;
+    return 0;
 }
 
 static void process_tx(uint8_t * mac, uint8_t status)
@@ -154,7 +152,6 @@ static void set_color(uint32_t rgb)
 void setup(void)
 {
     Serial.begin(115200);
-    EditInit(editline, sizeof(editline));
 
 #ifdef LED_RGB
     strip1.updateType(NEO_BGR);
@@ -223,31 +220,6 @@ void loop(void)
     }
 
     // parse command line
-    bool haveLine = false;
-    if (Serial.available()) {
-        char c;
-        haveLine = EditLine(Serial.read(), &c);
-        Serial.write(c);
-    }
-    if (haveLine) {
-        int result = cmd_process(commands, editline);
-        switch (result) {
-        case CMD_OK:
-            printf("OK\n");
-            break;
-        case CMD_NO_CMD:
-            break;
-        case CMD_UNKNOWN:
-            printf("Unknown command, available commands:\n");
-            show_help(commands);
-            break;
-        case CMD_ARG:
-            printf("Invalid argument(s)\n");
-            break;
-        default:
-            printf("%d\n", result);
-            break;
-        }
-        printf(">");
-    }
+    // command line processing
+    shell.process(">", commands);
 }
